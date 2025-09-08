@@ -1,219 +1,743 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>🎨 Advanced Image Editor</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pro Filter Studio — Professional Image Editor</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
   <style>
-    body {
-      font-family: sans-serif;
-      background: linear-gradient(135deg, #1a1a2e, #16213e);
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
+    /* extra polish */
+    :root{
+      --glass: rgba(255,255,255,0.06);
+      --muted: rgba(255,255,255,0.7);
+      --accent1: #7c3aed;
+      --accent2: #06b6d4;
     }
-    .app {
-      width: 90%;
-      height: 90%;
-      background: rgba(255,255,255,0.05);
-      border-radius: 20px;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      display: flex;
-      overflow: hidden;
+    html,body,#app{height:100%;margin:0}
+    body{
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(135deg,#071019 0%, #0b1220 100%);
+      color:#fff;
     }
-    .left {
-      flex: 2;
-      display: flex;
-      flex-direction: column;
-      padding: 20px;
+
+    /* range style */
+    input[type=range]{
+      -webkit-appearance:none; appearance:none;
+      height:6px; border-radius:999px; background:linear-gradient(90deg,var(--accent1),var(--accent2));
     }
-    .right {
-      flex: 1;
-      overflow-y: auto;
-      border-left: 1px solid rgba(255,255,255,0.2);
-      padding: 20px;
+    input[type=range]::-webkit-slider-thumb{
+      -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+      background:linear-gradient(180deg,#fff,#e6e6e6); box-shadow:0 3px 10px rgba(0,0,0,0.35);
+      border:2px solid rgba(0,0,0,0.2);
     }
-    .upload {
-      border: 2px dashed rgba(255,255,255,0.3);
-      padding: 30px;
-      text-align: center;
-      border-radius: 12px;
-      cursor: pointer;
+
+    /* canvas container behavior */
+    .canvas-wrapper{ background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; border:1px solid rgba(255,255,255,0.03); overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; }
+    #previewCanvas{ cursor:grab; max-width:100%; max-height:100%; display:block; }
+    #previewCanvas.grabbing{ cursor:grabbing; }
+
+    /* preview overlay label */
+    .badge{
+      background: linear-gradient(90deg,var(--accent1),var(--accent2));
+      padding:6px 10px; border-radius:999px; font-weight:700; color:white; display:inline-flex; gap:8px; align-items:center;
     }
-    canvas {
-      margin-top: 20px;
-      flex: 1;
-      max-width: 100%;
-      border-radius: 12px;
-      background: #111;
-    }
-    .toolbar {
-      margin-top: 10px;
-      display: flex;
-      gap: 10px;
-    }
-    button {
-      padding: 8px 15px;
-      border: none;
-      border-radius: 8px;
-      background: linear-gradient(45deg, #4facfe, #00f2fe);
-      color: #fff;
-      cursor: pointer;
-    }
-    button:hover {
-      opacity: 0.9;
-    }
-    .control {
-      margin-bottom: 12px;
-    }
-    .control label {
-      display: block;
-      font-size: 0.9rem;
-      margin-bottom: 4px;
-    }
-    input[type=range] {
-      width: 100%;
-      accent-color: #4facfe;
+
+    /* subtle hover */
+    .control-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(0,0,0,0.45); }
+
+    /* small screens */
+    @media (max-width: 900px){
+      .desktop-grid { flex-direction:column; height:100vh; }
+      .sidebar { max-height: 35vh; overflow:auto; }
+      #previewCanvas { max-height: 50vh; }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="left">
-      <div class="upload" id="uploadBox">Click or Drop Image Here
-        <input type="file" id="fileInput" accept="image/*" style="display:none;">
+  <div id="app" class="flex flex-col h-screen">
+    <!-- Topbar -->
+    <header class="flex items-center justify-between px-6 py-4 bg-transparent">
+      <div class="flex items-center gap-3">
+        <div class="p-2 rounded-lg" style="background:linear-gradient(90deg,#0ea5a4,#7c3aed)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12h20" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <div class="text-white font-bold text-lg">Pro Filter Studio</div>
+          <div class="text-sm text-white/70">Professional editor — single file</div>
+        </div>
       </div>
-      <canvas id="canvas"></canvas>
-      <div class="toolbar">
-        <button id="reset">Reset</button>
-        <button id="download">Download</button>
+
+      <div class="flex items-center gap-3">
+        <button id="previewBtn" class="badge" title="Press & hold to preview original (before)">
+          <i class="fa-solid fa-eye"></i><span id="previewLabel">Preview</span>
+        </button>
+        <div class="flex items-center gap-2 bg-white/5 px-2 py-1 rounded-lg">
+          <label class="text-sm text-white/80 mr-2">Export</label>
+          <select id="exportFormat" class="bg-transparent text-white/90 outline-none">
+            <option value="png">PNG</option>
+            <option value="jpeg">JPEG</option>
+          </select>
+          <input id="jpegQuality" type="range" min="40" max="100" value="92" class="w-24 ml-2" title="JPEG quality">
+        </div>
+        <button id="resetBtn" class="px-4 py-2 rounded-lg bg-white/7 hover:bg-white/10">Reset</button>
+        <button id="downloadBtn" class="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-500 shadow-lg">Download</button>
       </div>
-    </div>
-    <div class="right">
-      <div class="control"><label>Brightness</label><input type="range" id="brightness" min="0" max="200" value="100"></div>
-      <div class="control"><label>Contrast</label><input type="range" id="contrast" min="0" max="200" value="100"></div>
-      <div class="control"><label>Saturation</label><input type="range" id="saturate" min="0" max="200" value="100"></div>
-      <div class="control"><label>Exposure</label><input type="range" id="exposure" min="50" max="150" value="100"></div>
-      <div class="control"><label>Gamma</label><input type="range" id="gamma" min="50" max="200" value="100"></div>
-      <div class="control"><label>Sepia</label><input type="range" id="sepia" min="0" max="100" value="0"></div>
-      <div class="control"><label>Grayscale</label><input type="range" id="grayscale" min="0" max="100" value="0"></div>
-      <div class="control"><label>Invert</label><input type="range" id="invert" min="0" max="100" value="0"></div>
-      <div class="control"><label>Blur</label><input type="range" id="blur" min="0" max="10" value="0"></div>
-      <div class="control"><label>Hue Rotate</label><input type="range" id="hue" min="0" max="360" value="0"></div>
-    </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="flex-1 flex desktop-grid gap-6 px-6 pb-6" style="display:flex;">
+      <!-- left: canvas & controls -->
+      <section class="flex-1 flex flex-col gap-4">
+        <!-- upload area -->
+        <div id="uploadArea" class="p-4 rounded-xl canvas-wrapper" style="height: 160px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; border-style:dashed;">
+          <div class="text-center">
+            <div class="text-2xl font-bold text-white/90">Drop or click to upload</div>
+            <div class="text-sm text-white/60">PNG, JPG, WEBP — your browser handles limits</div>
+            <div class="mt-3">
+              <button id="selectBtn" class="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-500">Choose file</button>
+            </div>
+          </div>
+          <input id="fileInput" type="file" accept="image/*" class="hidden">
+        </div>
+
+        <!-- canvas area -->
+        <div class="flex-1 canvas-wrapper p-3" id="canvasFrame">
+          <div class="absolute left-4 top-4 z-10 flex items-center gap-2">
+            <button id="zoomOut" class="px-2 py-1 rounded-md bg-white/6">-</button>
+            <div id="zoomLevel" class="px-3 py-1 bg-white/4 rounded-md">100%</div>
+            <button id="zoomIn" class="px-2 py-1 rounded-md bg-white/6">+</button>
+          </div>
+          <canvas id="previewCanvas"></canvas>
+        </div>
+
+        <!-- small hint -->
+        <div class="text-sm text-white/60">Use mouse wheel to zoom, drag to pan. Press & hold <span class="font-semibold">Preview</span> to see the original image.</div>
+      </section>
+
+      <!-- right: sidebar -->
+      <aside class="w-96 sidebar">
+        <div class="space-y-4">
+          <!-- Tabs -->
+          <div class="flex gap-2">
+            <button class="px-3 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-500 font-semibold" data-tab="adjust">Adjust</button>
+            <button class="px-3 py-2 rounded-lg bg-white/6" data-tab="creative">Creative</button>
+            <button class="px-3 py-2 rounded-lg bg-white/6" data-tab="presets">Presets</button>
+          </div>
+
+          <!-- Adjust panel -->
+          <div id="adjust" class="panel bg-white/4 p-4 rounded-xl control-card">
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label class="text-sm text-white/80">Brightness</label>
+                <input id="brightness" type="range" min="0" max="200" value="100">
+              </div>
+              <div>
+                <label class="text-sm text-white/80">Contrast</label>
+                <input id="contrast" type="range" min="0" max="200" value="100">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label class="text-sm text-white/80">Saturation</label>
+                <input id="saturate" type="range" min="0" max="200" value="100">
+              </div>
+              <div>
+                <label class="text-sm text-white/80">Vibrance</label>
+                <input id="vibrance" type="range" min="0" max="200" value="100">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-sm text-white/80">Exposure</label>
+                <input id="exposure" type="range" min="50" max="200" value="100">
+              </div>
+              <div>
+                <label class="text-sm text-white/80">Gamma</label>
+                <input id="gamma" type="range" min="50" max="300" value="100">
+              </div>
+            </div>
+          </div>
+
+          <!-- Creative panel -->
+          <div id="creative" class="panel hidden bg-white/4 p-4 rounded-xl control-card">
+            <div class="mb-3">
+              <label class="text-sm text-white/80">Hue Rotate</label>
+              <input id="hue" type="range" min="0" max="360" value="0">
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label class="text-sm text-white/80">Temperature</label>
+                <input id="temperature" type="range" min="-100" max="100" value="0">
+              </div>
+              <div>
+                <label class="text-sm text-white/80">Tint</label>
+                <input id="tint" type="range" min="-100" max="100" value="0">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label class="text-sm text-white/80">Blur</label>
+                <input id="blur" type="range" min="0" max="8" step="0.1" value="0">
+              </div>
+              <div>
+                <label class="text-sm text-white/80">Sharpen</label>
+                <input id="sharpen" type="range" min="0" max="100" value="0">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-sm text-white/80">Sepia</label>
+                <input id="sepia" type="range" min="0" max="100" value="0">
+              </div>
+              <div>
+                <label class="text-sm text-white/80">Grayscale</label>
+                <input id="grayscale" type="range" min="0" max="100" value="0">
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <label class="text-sm text-white/80">Invert</label>
+              <input id="invert" type="range" min="0" max="100" value="0">
+            </div>
+
+            <div class="mt-3">
+              <label class="text-sm text-white/80">Vignette</label>
+              <input id="vignette" type="range" min="0" max="100" value="0">
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div id="presets" class="panel hidden bg-white/4 p-4 rounded-xl control-card">
+            <div class="grid grid-cols-2 gap-2">
+              <button class="px-3 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-500 text-sm font-semibold" data-preset="vintage">Vintage</button>
+              <button class="px-3 py-2 rounded-lg bg-white/6 text-sm font-semibold" data-preset="cinematic">Cinematic</button>
+              <button class="px-3 py-2 rounded-lg bg-white/6 text-sm font-semibold" data-preset="warm">Warm</button>
+              <button class="px-3 py-2 rounded-lg bg-white/6 text-sm font-semibold" data-preset="cool">Cool</button>
+              <button class="px-3 py-2 rounded-lg bg-white/6 text-sm font-semibold" data-preset="dramatic">Dramatic</button>
+              <button class="px-3 py-2 rounded-lg bg-white/6 text-sm font-semibold" data-preset="soft">Soft</button>
+              <button class="px-3 py-2 rounded-lg bg-white/6 text-sm font-semibold" data-preset="vivid">Vivid</button>
+              <button class="px-3 py-2 rounded-lg bg-white/6 text-sm font-semibold" data-preset="bw">B & W</button>
+            </div>
+          </div>
+
+          <!-- footer note -->
+          <div class="text-sm text-white/60">Tips: use wheel to zoom, drag to pan the canvas. Large images may take longer to export.</div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="px-6 py-3 text-sm text-white/60">Built with care — Pro Filter Studio</footer>
   </div>
 
+  <!-- FontAwesome (for icons) -->
+  <script src="https://kit.fontawesome.com/a2e0b8b6b8.js" crossorigin="anonymous"></script>
+
+  <!-- App logic -->
   <script>
-    class Editor {
-      constructor() {
-        this.canvas = document.getElementById('canvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.img = null;
-        this.filters = {
-          brightness: 100,
-          contrast: 100,
-          saturate: 100,
-          exposure: 100,
-          gamma: 100,
-          sepia: 0,
-          grayscale: 0,
-          invert: 0,
-          blur: 0,
-          hue: 0
-        };
-        this.initEvents();
-      }
+  // Pro Filter Studio - single-file app
+  class ProFilterStudio {
+    constructor() {
+      // elements
+      this.fileInput = document.getElementById('fileInput');
+      this.selectBtn = document.getElementById('selectBtn');
+      this.uploadArea = document.getElementById('uploadArea');
+      this.previewCanvas = document.getElementById('previewCanvas');
+      this.previewCtx = this.previewCanvas.getContext('2d');
+      this.canvasFrame = document.getElementById('canvasFrame');
 
-      initEvents() {
-        document.getElementById('uploadBox').addEventListener('click', () =>
-          document.getElementById('fileInput').click()
-        );
-        document.getElementById('fileInput').addEventListener('change', e =>
-          this.load(e.target.files[0])
-        );
-        ['dragover','drop'].forEach(ev => {
-          document.getElementById('uploadBox').addEventListener(ev, e => {
-            e.preventDefault();
-            if(ev==='drop') this.load(e.dataTransfer.files[0]);
-          });
+      this.previewBtn = document.getElementById('previewBtn');
+      this.previewLabel = document.getElementById('previewLabel');
+      this.downloadBtn = document.getElementById('downloadBtn');
+      this.resetBtn = document.getElementById('resetBtn');
+      this.zoomInBtn = document.getElementById('zoomIn');
+      this.zoomOutBtn = document.getElementById('zoomOut');
+      this.zoomLevelEl = document.getElementById('zoomLevel');
+
+      this.exportFormat = document.getElementById('exportFormat');
+      this.jpegQuality = document.getElementById('jpegQuality');
+
+      // inputs (map)
+      const ids = ['brightness','contrast','saturate','vibrance','exposure','gamma','hue','temperature','tint','blur','sharpen','sepia','grayscale','invert','vignette'];
+      this.inputs = {};
+      ids.forEach(id => this.inputs[id] = document.getElementById(id));
+
+      // tabs
+      document.querySelectorAll('[data-tab]').forEach(b=>{
+        b.addEventListener('click', ()=> {
+          document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('bg-gradient-to-r','from-violet-600','to-cyan-500','font-semibold'));
+          document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+          b.classList.add('bg-gradient-to-r','from-violet-600','to-cyan-500','font-semibold');
+          const id = b.dataset.tab;
+          document.getElementById(id).classList.remove('hidden');
         });
+      });
 
-        Object.keys(this.filters).forEach(f=>{
-          document.getElementById(f)?.addEventListener('input', e=>{
-            this.filters[f] = +e.target.value;
-            this.draw();
-          });
+      // initial UI state
+      document.querySelector('[data-tab="adjust"]').classList.add('bg-gradient-to-r','from-violet-600','to-cyan-500','font-semibold');
+      document.getElementById('adjust').classList.remove('hidden');
+
+      // state
+      this.originalImage = null;
+      this.state = {
+        brightness:100, contrast:100, saturate:100, vibrance:100,
+        exposure:100, gamma:100, hue:0, temperature:0, tint:0,
+        blur:0, sharpen:0, sepia:0, grayscale:0, invert:0, vignette:0,
+        zoom:1, offsetX:0, offsetY:0
+      };
+      this.previewingOriginal = false;
+
+      this.attachEvents();
+      this.updateZoomUI();
+    }
+
+    attachEvents(){
+      this.selectBtn.addEventListener('click', ()=> this.fileInput.click());
+      this.fileInput.addEventListener('change', e => this.loadFile(e.target.files[0]));
+
+      // drag & drop
+      ['dragover','dragenter'].forEach(ev => {
+        this.uploadArea.addEventListener(ev, (e)=> { e.preventDefault(); this.uploadArea.classList.add('ring'); });
+      });
+      ['dragleave','drop','dragend'].forEach(ev => {
+        this.uploadArea.addEventListener(ev, (e)=> { e.preventDefault(); this.uploadArea.classList.remove('ring'); });
+      });
+      this.uploadArea.addEventListener('drop', e => {
+        if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) this.loadFile(e.dataTransfer.files[0]);
+      });
+
+      // slider inputs
+      Object.keys(this.inputs).forEach(k => {
+        const el = this.inputs[k];
+        if(!el) return;
+        el.addEventListener('input', (e)=> {
+          this.state[k] = Number(e.target.value);
+          this.renderPreview();
         });
+      });
 
-        document.getElementById('reset').addEventListener('click', ()=>this.reset());
-        document.getElementById('download').addEventListener('click', ()=>this.download());
-      }
+      // presets
+      document.querySelectorAll('[data-preset]').forEach(b => {
+        b.addEventListener('click', ()=> this.applyPreset(b.dataset.preset));
+      });
 
-      load(file) {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = e => {
-          this.img = new Image();
-          this.img.onload = () => {
-            this.canvas.width = this.img.width;
-            this.canvas.height = this.img.height;
-            this.reset();
-          };
-          this.img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
+      // preview original hold behavior
+      let hold = false;
+      this.previewBtn.addEventListener('mousedown', ()=> { hold = true; this.previewingOriginal = true; this.renderPreview(); });
+      window.addEventListener('mouseup', ()=> { if(hold){ hold = false; this.previewingOriginal = false; this.renderPreview(); }});
+      // touch support
+      this.previewBtn.addEventListener('touchstart', (e)=> { e.preventDefault(); this.previewingOriginal = true; this.renderPreview(); });
+      document.addEventListener('touchend', ()=> { this.previewingOriginal = false; this.renderPreview(); });
 
-      draw() {
-        if (!this.img) return;
-        const f = this.filters;
-        const filterStr = `
-          brightness(${f.brightness}%)
-          contrast(${f.contrast}%)
-          saturate(${f.saturate}%)
-          sepia(${f.sepia}%)
-          grayscale(${f.grayscale}%)
-          invert(${f.invert}%)
-          blur(${f.blur}px)
-          hue-rotate(${f.hue}deg)
-        `;
-        this.ctx.filter = filterStr;
-        this.ctx.drawImage(this.img, 0, 0, this.canvas.width, this.canvas.height);
+      // download / reset
+      this.downloadBtn.addEventListener('click', ()=> this.downloadImage());
+      this.resetBtn.addEventListener('click', ()=> this.resetAll());
 
-        // simulate exposure & gamma manually
-        let imgData = this.ctx.getImageData(0,0,this.canvas.width,this.canvas.height);
-        let data = imgData.data;
-        let exp = f.exposure/100;
-        let gamma = f.gamma/100;
-        for(let i=0;i<data.length;i+=4){
-          data[i]   = 255 * Math.pow((data[i]/255)*exp, 1/gamma);
-          data[i+1] = 255 * Math.pow((data[i+1]/255)*exp, 1/gamma);
-          data[i+2] = 255 * Math.pow((data[i+2]/255)*exp, 1/gamma);
+      // zoom/pan
+      this.zoomInBtn.addEventListener('click', ()=> this.adjustZoom(0.1));
+      this.zoomOutBtn.addEventListener('click', ()=> this.adjustZoom(-0.1));
+      this.previewCanvas.addEventListener('wheel', (e)=> {
+        if(!this.originalImage) return;
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.08 : -0.08;
+        // compute anchor in image space
+        const rect = this.previewCanvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left - rect.width/2) / this.state.zoom;
+        const my = (e.clientY - rect.top - rect.height/2) / this.state.zoom;
+        this.adjustZoom(delta, mx, my);
+      });
+
+      // drag to pan
+      this.isDragging = false;
+      this.lastMouse = {x:0,y:0};
+      this.previewCanvas.addEventListener('mousedown', (e)=> {
+        if(!this.originalImage) return;
+        this.isDragging = true; this.previewCanvas.classList.add('grabbing');
+        this.lastMouse = {x:e.clientX, y:e.clientY};
+      });
+      window.addEventListener('mousemove', (e)=> {
+        if(!this.isDragging) return;
+        const dx = (e.clientX - this.lastMouse.x) / this.state.zoom;
+        const dy = (e.clientY - this.lastMouse.y) / this.state.zoom;
+        this.state.offsetX += dx; this.state.offsetY += dy;
+        this.lastMouse = {x:e.clientX, y:e.clientY};
+        this.renderPreview();
+      });
+      window.addEventListener('mouseup', ()=> { this.isDragging=false; this.previewCanvas.classList.remove('grabbing'); });
+
+      // touch pan
+      this.previewCanvas.addEventListener('touchstart', (e)=> {
+        if(!this.originalImage || e.touches.length!==1) return;
+        this.isDragging = true; this.lastMouse = {x:e.touches[0].clientX, y:e.touches[0].clientY};
+      }, {passive:false});
+      this.previewCanvas.addEventListener('touchmove', (e)=> {
+        if(!this.isDragging || e.touches.length!==1) return;
+        e.preventDefault();
+        const dx = (e.touches[0].clientX - this.lastMouse.x) / this.state.zoom;
+        const dy = (e.touches[0].clientY - this.lastMouse.y) / this.state.zoom;
+        this.state.offsetX += dx; this.state.offsetY += dy;
+        this.lastMouse = {x:e.touches[0].clientX, y:e.touches[0].clientY};
+        this.renderPreview();
+      }, {passive:false});
+      window.addEventListener('touchend', ()=> { this.isDragging=false; });
+
+      // window resize: adjust CSS size of canvas to fit frame
+      new ResizeObserver(()=> this.fitCanvasToFrame()).observe(this.canvasFrame);
+
+      // keyboard shortcuts
+      window.addEventListener('keydown', (e)=> {
+        if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
+          e.preventDefault(); this.downloadImage();
         }
-        this.ctx.putImageData(imgData,0,0);
+        if(e.key === ' ') { e.preventDefault(); this.previewingOriginal = true; this.renderPreview(); }
+      });
+      window.addEventListener('keyup', (e)=> { if(e.key === ' ') { this.previewingOriginal = false; this.renderPreview(); }});
+    }
+
+    loadFile(file){
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          this.originalImage = img;
+          // reset transforms
+          this.state.zoom = 1; this.state.offsetX = 0; this.state.offsetY = 0;
+          // set canvas pixel size to original image for sharp preview & export
+          this.previewCanvas.width = img.width;
+          this.previewCanvas.height = img.height;
+          // set CSS sizing to fit frame
+          this.fitCanvasToFrame(true);
+          this.renderPreview();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    fitCanvasToFrame(forceFit=false){
+      if(!this.originalImage) {
+        // set a default size
+        this.previewCanvas.style.width = '100%';
+        this.previewCanvas.style.height = '100%';
+        return;
+      }
+      const cont = this.canvasFrame.getBoundingClientRect();
+      // compute fit size preserving aspect ratio
+      const imgAspect = this.originalImage.width / this.originalImage.height;
+      let w = cont.width - 12, h = cont.height - 12;
+      if(w / h > imgAspect) w = Math.round(h * imgAspect); else h = Math.round(w / imgAspect);
+      this.previewCanvas.style.width = w + 'px';
+      this.previewCanvas.style.height = h + 'px';
+    }
+
+    updateZoomUI(){ this.zoomLevelEl.textContent = Math.round(this.state.zoom*100) + '%'; }
+
+    clampZoom(z){ return Math.max(0.2, Math.min(6, z)); }
+    adjustZoom(delta, anchorX=0, anchorY=0){
+      const oldZoom = this.state.zoom;
+      let newZoom = this.clampZoom(oldZoom + delta);
+      // re-center offsets around anchor in image-space
+      this.state.offsetX = (this.state.offsetX - anchorX) * (newZoom/oldZoom) + anchorX;
+      this.state.offsetY = (this.state.offsetY - anchorY) * (newZoom/oldZoom) + anchorY;
+      this.state.zoom = newZoom;
+      this.updateZoomUI();
+      this.renderPreview();
+    }
+
+    // Build CSS filter string (fast)
+    buildFilterString(){
+      const s = this.state;
+      const parts = [];
+      if(s.brightness !== 100) parts.push(`brightness(${s.brightness}%)`);
+      if(s.contrast !== 100) parts.push(`contrast(${s.contrast}%)`);
+      if(s.saturate !== 100) parts.push(`saturate(${s.saturate}%)`);
+      if(s.sepia !== 0) parts.push(`sepia(${s.sepia}%)`);
+      if(s.grayscale !== 0) parts.push(`grayscale(${s.grayscale}%)`);
+      if(s.invert !== 0) parts.push(`invert(${s.invert}%)`);
+      if(s.blur > 0) parts.push(`blur(${s.blur}px)`);
+      if(s.hue !== 0) parts.push(`hue-rotate(${s.hue}deg)`);
+      return parts.join(' ') || 'none';
+    }
+
+    // Render preview (fast): use ctx.filter for most things; advanced pixel ops are applied on preview for exposure/gamma/vibrance/temp/tint/sharpen/vignette
+    renderPreview(){
+      const ctx = this.previewCtx;
+      if(!this.originalImage){ ctx.clearRect(0,0,this.previewCanvas.width,this.previewCanvas.height); return; }
+      ctx.save();
+      ctx.clearRect(0,0,this.previewCanvas.width,this.previewCanvas.height);
+
+      // If user is holding Preview (original) show original image only
+      if(this.previewingOriginal){
+        ctx.filter = 'none';
+        // compute drawing position centered with zoom and offset
+        this.drawImageCentered(ctx, this.originalImage, this.state.zoom, this.state.offsetX, this.state.offsetY);
+        ctx.restore();
+        return;
       }
 
-      reset() {
-        this.filters = {brightness:100, contrast:100, saturate:100, exposure:100, gamma:100,
-                        sepia:0, grayscale:0, invert:0, blur:0, hue:0};
-        Object.keys(this.filters).forEach(f=>{
-          if(document.getElementById(f)) document.getElementById(f).value = this.filters[f];
-        });
-        this.draw();
+      // apply CSS filters
+      ctx.filter = this.buildFilterString();
+
+      // draw image
+      this.drawImageCentered(ctx, this.originalImage, this.state.zoom, this.state.offsetX, this.state.offsetY);
+
+      // advanced pixel ops only when needed (exposure/gamma/vibrance/temperature/tint/sharpen/vignette)
+      const needPixel = (this.state.exposure !== 100 || this.state.gamma !== 100 || this.state.vibrance !== 100 || this.state.temperature !== 0 || this.state.tint !== 0 || this.state.sharpen !== 0 || this.state.vignette !== 0);
+      if(needPixel){
+        try {
+          const w = this.previewCanvas.width, h = this.previewCanvas.height;
+          let imgData = ctx.getImageData(0,0,w,h);
+          let data = imgData.data;
+          // pixel transforms
+          const exp = this.state.exposure / 100;
+          const gamma = this.state.gamma / 100;
+          const vibranceFactor = (this.state.vibrance - 100) / 100;
+          const temp = this.state.temperature / 100;
+          const tint = this.state.tint / 100;
+          for(let i=0;i<data.length;i+=4){
+            let r = data[i], g = data[i+1], b = data[i+2];
+            // exposure & gamma
+            r = 255 * Math.pow(Math.min(1, (r/255)*exp), 1/gamma);
+            g = 255 * Math.pow(Math.min(1, (g/255)*exp), 1/gamma);
+            b = 255 * Math.pow(Math.min(1, (b/255)*exp), 1/gamma);
+
+            // temperature
+            if(temp !== 0){
+              if(temp > 0){ r = Math.min(255, r + temp * 40); g = Math.min(255, g + temp*12);}
+              else { b = Math.min(255, b - temp * 40); g = Math.min(255, g - temp*12); }
+            }
+            // tint
+            if(tint !== 0){
+              if(tint > 0) g = Math.min(255, g + tint * 30);
+              else r = Math.max(0, r + tint * 30);
+            }
+
+            // vibrance
+            if(vibranceFactor !== 0){
+              const max = Math.max(r,g,b), avg = (r+g+b)/3;
+              const amt = ((Math.abs(max - avg)) * 2 / 255) * vibranceFactor;
+              if(r !== max) r += (max - r) * amt;
+              if(g !== max) g += (max - g) * amt;
+              if(b !== max) b += (max - b) * amt;
+            }
+
+            data[i] = Math.round(Math.max(0,Math.min(255,r)));
+            data[i+1] = Math.round(Math.max(0,Math.min(255,g)));
+            data[i+2] = Math.round(Math.max(0,Math.min(255,b)));
+          }
+          ctx.putImageData(imgData,0,0);
+
+          // quick sharpen (approx) for preview if requested
+          if(this.state.sharpen > 0){
+            this.applyQuickSharpen(ctx, this.previewCanvas.width, this.previewCanvas.height, Math.round(this.state.sharpen/20));
+          }
+
+          // vignette
+          if(this.state.vignette > 0){
+            this.drawVignette(ctx, this.previewCanvas.width, this.previewCanvas.height, this.state.vignette/100);
+          }
+        } catch(err){
+          // getImageData could fail for cross-origin images (rare for local uploads)
+          console.warn('preview pixel ops skipped:', err);
+        }
       }
 
-      download() {
-        this.draw(); // ensure latest filters applied
-        const link = document.createElement('a');
-        link.download = 'edited.png';
-        link.href = this.canvas.toDataURL('image/png');
-        link.click();
+      ctx.restore();
+      this.updateZoomUI();
+    }
+
+    drawImageCentered(ctx, img, scale=1, offsetX=0, offsetY=0){
+      const cw = ctx.canvas.width, ch = ctx.canvas.height;
+      const drawW = img.width * scale, drawH = img.height * scale;
+      // center and apply offsets (offsets are in image-space units)
+      const x = cw/2 + offsetX*scale - drawW/2;
+      const y = ch/2 + offsetY*scale - drawH/2;
+      ctx.drawImage(img, x, y, drawW, drawH);
+    }
+
+    // A quick approximate sharpen for preview
+    applyQuickSharpen(ctx, w, h, repeats=1){
+      try {
+        for(let r=0;r<repeats;r++){
+          const src = ctx.getImageData(0,0,w,h);
+          const dst = ctx.createImageData(w,h);
+          const s = src.data, o = dst.data;
+          for(let y=1;y<h-1;y++){
+            for(let x=1;x<w-1;x++){
+              const idx = (y*w + x) * 4;
+              for(let c=0;c<3;c++){
+                const center = s[idx + c];
+                const neighbors = (s[idx - 4 + c] + s[idx + 4 + c] + s[idx - w*4 + c] + s[idx + w*4 + c]) * 0.25;
+                const val = center + (center - neighbors) * 0.9;
+                o[idx + c] = Math.max(0, Math.min(255, val));
+              }
+              o[idx+3] = s[idx+3];
+            }
+          }
+          ctx.putImageData(dst, 0, 0);
+        }
+      } catch(e){ /* ignore if heavy */ }
+    }
+
+    drawVignette(ctx, w, h, intensity=0.35){
+      const cx = w/2, cy = h/2, maxR = Math.sqrt(cx*cx + cy*cy);
+      const g = ctx.createRadialGradient(cx, cy, maxR*0.2, cx, cy, maxR);
+      g.addColorStop(0, `rgba(0,0,0,0)`);
+      g.addColorStop(0.6, `rgba(0,0,0,${intensity*0.25})`);
+      g.addColorStop(1, `rgba(0,0,0,${intensity})`);
+      ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = g; ctx.fillRect(0,0,w,h); ctx.restore();
+    }
+
+    // Export: full-resolution re-render and pixel operations
+    async downloadImage(){
+      if(!this.originalImage) return alert('Upload an image first.');
+      // create full-res canvas same as original image dimensions
+      const w = this.originalImage.width, h = this.originalImage.height;
+      const dCanvas = document.createElement('canvas'); dCanvas.width = w; dCanvas.height = h;
+      const dctx = dCanvas.getContext('2d');
+
+      // Apply CSS-like filters where possible
+      dctx.filter = this.buildFilterString();
+      dctx.drawImage(this.originalImage, 0, 0, w, h);
+
+      // Pixel-level postprocessing
+      let imgData = dctx.getImageData(0,0,w,h);
+      let data = imgData.data;
+      const exp = this.state.exposure/100;
+      const gamma = this.state.gamma/100;
+      const vibranceFactor = (this.state.vibrance - 100)/100;
+      const temp = this.state.temperature / 100;
+      const tint = this.state.tint / 100;
+
+      for(let i=0;i<data.length;i+=4){
+        let r = data[i], g = data[i+1], b = data[i+2];
+
+        // exposure & gamma
+        r = 255 * Math.pow(Math.min(1, (r/255)*exp), 1/gamma);
+        g = 255 * Math.pow(Math.min(1, (g/255)*exp), 1/gamma);
+        b = 255 * Math.pow(Math.min(1, (b/255)*exp), 1/gamma);
+
+        // temperature
+        if(temp !== 0){
+          if(temp > 0){ r = Math.min(255, r + temp * 40); g = Math.min(255, g + temp * 12);}
+          else { b = Math.min(255, b - temp * 40); g = Math.min(255, g - temp * 12); }
+        }
+        // tint
+        if(tint !== 0){
+          if(tint > 0) g = Math.min(255, g + tint * 30);
+          else r = Math.max(0, r + tint * 30);
+        }
+
+        // vibrance
+        if(vibranceFactor !== 0){
+          const max = Math.max(r,g,b);
+          const avg = (r+g+b)/3;
+          const amt = ((Math.abs(max - avg)) * 2 / 255) * vibranceFactor;
+          if(r !== max) r += (max - r) * amt;
+          if(g !== max) g += (max - g) * amt;
+          if(b !== max) b += (max - b) * amt;
+        }
+
+        data[i] = Math.round(Math.max(0,Math.min(255,r)));
+        data[i+1] = Math.round(Math.max(0,Math.min(255,g)));
+        data[i+2] = Math.round(Math.max(0,Math.min(255,b)));
+      }
+      dctx.putImageData(imgData,0,0);
+
+      // Sharpen on full-res using convolution (unsharp-ish)
+      if(this.state.sharpen > 0){
+        this.applySharpenConvolution(dctx, w, h, this.state.sharpen/100);
+      }
+
+      // Vignette overlay
+      if(this.state.vignette > 0){
+        this.drawVignette(dctx, w, h, this.state.vignette/100);
+      }
+
+      // Prepare download
+      const fmt = this.exportFormat.value || 'png';
+      const quality = Math.max(0.01, Math.min(1, (Number(this.jpegQuality.value)||92)/100));
+      dCanvas.toBlob(blob => {
+        if(!blob){ alert('Export failed'); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pro-filter-${Date.now()}.${fmt === 'jpeg' ? 'jpg' : 'png'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, fmt === 'jpeg' ? 'image/jpeg' : 'image/png', quality);
+    }
+
+    // Sharpen convolution (full-res)
+    applySharpenConvolution(ctx, w, h, amount=0.5){
+      try {
+        const src = ctx.getImageData(0,0,w,h);
+        const dst = ctx.createImageData(w,h);
+        const s = src.data, o = dst.data;
+        // 3x3 kernel unsharp-like
+        for(let y=1;y<h-1;y++){
+          for(let x=1;x<w-1;x++){
+            const idx = (y*w + x)*4;
+            for(let c=0;c<3;c++){
+              const center = s[idx + c];
+              const neighbors = (s[idx - 4 + c] + s[idx + 4 + c] + s[idx - w*4 + c] + s[idx + w*4 + c]) * 0.25;
+              const val = center + (center - neighbors) * amount * 1.6;
+              o[idx + c] = Math.max(0, Math.min(255, val));
+            }
+            o[idx+3] = s[idx+3];
+          }
+        }
+        ctx.putImageData(dst,0,0);
+      } catch(e){
+        console.warn('Sharpen failed', e);
       }
     }
-    new Editor();
+
+    // presets (clean)
+    applyPreset(name){
+      const presets = {
+        vintage: {brightness:110, contrast:105, saturate:90, sepia:38, vibrance:95, vignette:18, temperature:12},
+        cinematic: {contrast:140, brightness:95, saturate:110, hue:345, vignette:24, sharpen:8},
+        warm: {brightness:104, contrast:102, saturate:115, temperature:20, tint:4},
+        cool: {brightness:96, contrast:102, saturate:95, temperature:-20, tint:-6},
+        dramatic: {brightness:85, contrast:150, saturate:120, vignette:36, sharpen:22},
+        soft: {brightness:110, contrast:92, saturate:95, blur:1.2, vignette:10},
+        vivid: {brightness:105, contrast:115, saturate:140, vibrance:135},
+        bw: {grayscale:100, contrast:110}
+      };
+      if(!presets[name]) return;
+      Object.assign(this.state, presets[name]);
+      // update sliders
+      Object.keys(this.inputs).forEach(k => { if(this.inputs[k]) this.inputs[k].value = this.state[k]; });
+      this.renderPreview();
+    }
+
+    resetAll(){
+      this.state = { brightness:100, contrast:100, saturate:100, vibrance:100, exposure:100, gamma:100, hue:0, temperature:0, tint:0, blur:0, sharpen:0, sepia:0, grayscale:0, invert:0, vignette:0, zoom:1, offsetX:0, offsetY:0 };
+      Object.keys(this.inputs).forEach(k => { if(this.inputs[k]) this.inputs[k].value = this.state[k]; });
+      this.renderPreview();
+    }
+  }
+
+  // bootstrap
+  const app = new ProFilterStudio();
+
+  // wire preset buttons globally (they're created in DOM)
+  document.querySelectorAll('[data-preset]').forEach(b => {
+    b.addEventListener('click', (e) => app.applyPreset(b.dataset.preset));
+  });
+
+  // optional: load a sample image (commented)
+  // fetch('sample.jpg').then(r=>r.blob()).then(blob=>app.loadFile(blob));
   </script>
 </body>
 </html>
