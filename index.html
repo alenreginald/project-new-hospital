@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Professional Image Filter Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <div class="header-content">
+          <h1><i class="fas fa-magic"></i> Filter Studio Pro</h1>
+          <div class="header-actions">
+            <button id="resetBtn" class="btn btn-secondary" disabled>
+              <i class="fas fa-undo"></i> Reset All
+            </button>
+            <button id="downloadBtn" class="btn btn-primary" disabled>
+              <i class="fas fa-download"></i> Download
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <div class="workspace">
+          <!-- Image Upload Area -->
+          <div class="image-section">
+            <div id="uploadArea" class="upload-area">
+              <div class="upload-content">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h3>Drop your image here</h3>
+                <p>or click to browse</p>
+                <input type="file" id="imageInput" accept="image/*" hidden>
+              </div>
+            </div>
+            
+            <div id="imageContainer" class="image-container" style="display: none;">
+              <div class="image-controls">
+                <button id="zoomOut" class="control-btn"><i class="fas fa-search-minus"></i></button>
+                <span id="zoomLevel">100%</span>
+                <button id="zoomIn" class="control-btn"><i class="fas fa-search-plus"></i></button>
+                <button id="togglePreview" class="control-btn toggle-btn">
+                  <i class="fas fa-eye"></i> Preview
+                </button>
+              </div>
+              <div class="image-wrapper">
+                <canvas id="imageCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filter Controls -->
+          <div class="filter-section">
+            <div class="filter-tabs">
+              <button class="tab-btn active" data-tab="basic">
+                <i class="fas fa-sliders-h"></i> Basic
+              </button>
+              <button class="tab-btn" data-tab="color">
+                <i class="fas fa-palette"></i> Color
+              </button>
+              <button class="tab-btn" data-tab="effects">
+                <i class="fas fa-star"></i> Effects
+              </button>
+              <button class="tab-btn" data-tab="presets">
+                <i class="fas fa-magic"></i> Presets
+              </button>
+            </div>
+
+            <div class="filter-content">
+              <!-- Basic Filters -->
+              <div id="basic" class="filter-panel active">
+                <div class="filter-group">
+                  <label>Brightness</label>
+                  <div class="slider-container">
+                    <input type="range" id="brightness" min="0" max="200" value="100" class="slider">
+                    <span class="slider-value">100%</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Contrast</label>
+                  <div class="slider-container">
+                    <input type="range" id="contrast" min="0" max="200" value="100" class="slider">
+                    <span class="slider-value">100%</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Saturation</label>
+                  <div class="slider-container">
+                    <input type="range" id="saturate" min="0" max="200" value="100" class="slider">
+                    <span class="slider-value">100%</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Blur</label>
+                  <div class="slider-container">
+                    <input type="range" id="blur" min="0" max="10" value="0" step="0.1" class="slider">
+                    <span class="slider-value">0px</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Color Filters -->
+              <div id="color" class="filter-panel">
+                <div class="filter-group">
+                  <label>Hue Rotate</label>
+                  <div class="slider-container">
+                    <input type="range" id="hue-rotate" min="0" max="360" value="0" class="slider">
+                    <span class="slider-value">0°</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Temperature</label>
+                  <div class="slider-container">
+                    <input type="range" id="temperature" min="-100" max="100" value="0" class="slider">
+                    <span class="slider-value">0</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Tint</label>
+                  <div class="slider-container">
+                    <input type="range" id="tint" min="-100" max="100" value="0" class="slider">
+                    <span class="slider-value">0</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Vibrance</label>
+                  <div class="slider-container">
+                    <input type="range" id="vibrance" min="0" max="200" value="100" class="slider">
+                    <span class="slider-value">100%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Effects -->
+              <div id="effects" class="filter-panel">
+                <div class="filter-group">
+                  <label>Grayscale</label>
+                  <div class="slider-container">
+                    <input type="range" id="grayscale" min="0" max="100" value="0" class="slider">
+                    <span class="slider-value">0%</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Sepia</label>
+                  <div class="slider-container">
+                    <input type="range" id="sepia" min="0" max="100" value="0" class="slider">
+                    <span class="slider-value">0%</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Invert</label>
+                  <div class="slider-container">
+                    <input type="range" id="invert" min="0" max="100" value="0" class="slider">
+                    <span class="slider-value">0%</span>
+                  </div>
+                </div>
+                
+                <div class="filter-group">
+                  <label>Vignette</label>
+                  <div class="slider-container">
+                    <input type="range" id="vignette" min="0" max="100" value="0" class="slider">
+                    <span class="slider-value">0%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Presets -->
+              <div id="presets" class="filter-panel">
+                <div class="preset-grid">
+                  <button class="preset-btn" data-preset="vintage">
+                    <div class="preset-preview vintage-preview"></div>
+                    <span>Vintage</span>
+                  </button>
+                  <button class="preset-btn" data-preset="cinematic">
+                    <div class="preset-preview cinematic-preview"></div>
+                    <span>Cinematic</span>
+                  </button>
+                  <button class="preset-btn" data-preset="warm">
+                    <div class="preset-preview warm-preview"></div>
+                    <span>Warm</span>
+                  </button>
+                  <button class="preset-btn" data-preset="cool">
+                    <div class="preset-preview cool-preview"></div>
+                    <span>Cool</span>
+                  </button>
+                  <button class="preset-btn" data-preset="dramatic">
+                    <div class="preset-preview dramatic-preview"></div>
+                    <span>Dramatic</span>
+                  </button>
+                  <button class="preset-btn" data-preset="soft">
+                    <div class="preset-preview soft-preview"></div>
+                    <span>Soft</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
